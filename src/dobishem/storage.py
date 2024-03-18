@@ -203,6 +203,9 @@ class DirectoryIter:
         self.directory = directory
         self.files = directory.contents.copy()
 
+    def __iter__(self):
+        return self
+
     def __next__(self):
         if self.files:
             name = self.files.pop()
@@ -219,6 +222,21 @@ class DirectoryAsDictionary:
 
     def __iter__(self):
         return DirectoryIter(self)
+
+    def items(self):
+        return self.__iter__()
+
+    def __getitem__(self, value):
+        pass
+
+    def __setitem__(self, key, value):
+        pass
+
+    def __contains__(self, key):
+        pass
+
+    def update(self, mapping):
+        pass
 
 class Storage:
 
