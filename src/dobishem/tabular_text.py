@@ -1,4 +1,6 @@
-# Read and write org-mode style tables
+"""Read and write org-mode style tables.
+
+See https://orgmode.org/"""
 
 import re
 
@@ -21,14 +23,20 @@ def read_tabular_to_lists(source):
             if not is_layout(line))
 
 def read_tabular_to_dicts(source):
-    """Read a tabular text to a list dicts of cells, and a column order list."""
+    """Read org-mode  tabular text to a list of dicts of cells, and a column order list."""
     rows = read_tabular_to_lists(source)
     header = next(rows)
     return ({k: v for k, v in dict(zip(header, row)).items() if v}
             for row in rows), header
 
 def dicts_to_tabular_string(data, column_order=[]):
-    """Convert a list of dicts to a tabular string."""
+    """Convert a list of dicts to a tabular string.
+
+    The order of the columns may be specified; otherwise they are sorted by name.
+
+    If an incomplete list of column names is given, they are put
+    first, and the others after them.
+    """
     as_strings = [{name: str(cell) for name, cell in row.items()} for row in data]
     all_columns = column_order + sorted(set().union(*[set(record.keys())
                                                       for record in as_strings])
@@ -47,6 +55,8 @@ def dicts_to_tabular_string(data, column_order=[]):
                      + [hline])
 
 def write_tabular(stream, data, column_order=[]):
-    """Write tabular data to a stream."""
+    """Write tabular data to a stream.
+
+    See dicts_to_tabular_string for details of column order handling."""
     stream.write(dicts_to_tabular_string(data, column_order))
     return data
