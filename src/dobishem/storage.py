@@ -219,7 +219,19 @@ TEMPLATE_PARAM_RE = re.compile("%\\(([a-zA-Z0-9_]+)\\)")
 class Storage:
 
     """A storage handler class,
-    providing templated filename generation from named parts."""
+    providing templated filename generation from named parts.
+
+    The templates are Python %-substitution strings with named
+    substitution parameters, and the parameter names should match the
+    kwargs given to methods such as resolve, load, and save.
+
+    For example, a template for a postal address could be:
+
+    "%(housenumber)d %(street)s, %(city)s, %(county)s"
+
+    Templates are chosen to support the kwargs supplied to the methods
+    that use them.
+    """
 
     def __init__(
             self,
@@ -284,13 +296,24 @@ class Storage:
         return open_for_write(self.resolve(**kwargs))
 
     def load(self, **kwargs):
+        """Read a file using templated name resolution and the generic load function from this module."""
         return load(self.resolve(**kwargs))
 
     def save(self, data, **kwargs):
+        """Write a file using templated name resolution and the generic save function from this module."""
         return save(self.resolve(**kwargs),
                     data)
 
 class UsingFiles(Storage):
+
+    """A class to iterate over input and output files.
+
+    Contrived example:
+
+    filer = UsingFiles(inputs=("in0.json", "in1.csv", "in2.yaml"),
+                       outputs=("out0.csv", "out1.yaml"))
+    filer.save(*my_function(*filer))
+    """
 
     def __init__(self, inputs, outputs, **kwargs):
         super().__init__(**kwargs)
@@ -299,11 +322,11 @@ class UsingFiles(Storage):
 
     def __next__(self):
         for location in self.inputs:
-            yield self.load_from(location)
+            yield self.load(location)
 
     def save(self, *values):
         for location, content in zip(self.outputs, values):
-            self.save_to(content, location)
+            self.save(content, location)
 
 def function_cached_with_file(function, filename):
     """Read a file and return its contents.
