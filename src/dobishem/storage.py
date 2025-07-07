@@ -332,18 +332,18 @@ def function_cached_with_file(function, filename):
     """Read a file and return its contents.
     If the file does not exist, run a function to create the contents,
     write them to the file, and return them."""
-    filename = _expand(filename)
     return (load(filename)
-            if os.path.exists(filename)
+            if os.path.exists(filename := _expand(filename))
             else save(filename, function()))
 
 def modified(filename):
     """Return the modification time of a file.
     If the file does not exist, the epoch is returned."""
-    if filename is None:
-        return 0
-    fname = _expand(filename)
-    return os.path.getmtime(fname) if os.path.exists(fname) else 0
+    return (0
+            if filename is None
+            else (os.path.getmtime(fname)
+                  if os.path.exists(fname := _expand(filename))
+                  else 0))
 
 def file_newer_than_file(a, b):
     return os.path.getmtime(_expand(a)) > os.path.getmtime(_expand(b))
@@ -352,9 +352,10 @@ def in_modification_order(filenames):
     """"Return a list of filenames sorted into modification order.
     If the filenames are given as a string rather than a list,
     apply shell-style globbing to convert it to a list."""
-    if isinstance(filenames, str):
-        filenames = glob.glob(_expand(filenames))
-    return sorted(filenames, key=modified)
+    return sorted((glob.glob(_expand(filenames))
+                   if isinstance(filenames, str)
+                   else filenames),
+                  key=modified)
 
 def most_recently_modified(filenames):
     """Return the most recently modified of a list of files."""
