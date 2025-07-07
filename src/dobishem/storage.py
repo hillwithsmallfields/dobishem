@@ -44,17 +44,23 @@ def read_csv(
         transform_row=None,
 ):
     """Read a CSV file, returning a structure according to result_type.
-    The result types are:
+
+    The possible result types are:
+
     list: a list of rows (key column is ignored)
     dict: a dictionary of rows, keyed by the key column
-    set: a dictionary of sets of rows, keyed by the key column
+    set:  a dictionary of sets of rows, keyed by the key column
 
     The elements of the structure are tuples, lists or dicts,
     according to row_type.
 
+    The key_column can be a string naming a column if the row_type is
+    dict, or a number if the row_type is list or tuple.
+
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
     row.  If it returns a false value for a row, that row is not used.
+
     """
     if not os.path.exists(_expand(filename)):
         if empty_for_missing:
@@ -73,7 +79,9 @@ def read_csv(
         if issubclass(result_type, set):
             result = defaultdict(set)
             for row in rows:
-                result[row[key_column]].add(frozendict(row))
+                result[row[key_column]].add(frozendict(row)
+                                            if issubclass(row_type, dict)
+                                            else tuple(row))
             return result
         return ({row[key_column]: row
                  for row in rows}
@@ -92,26 +100,20 @@ def column_headers(table):
 def write_csv(
         filename,
         data,
-        flatten=False,
         sort_columns=None,
         silently_skip_missing_data=True,
 ):
-    """Write a CSV file from a list or dict of lists or dicts,
-    or, if flatten is true, a dict or list of collections
-    of dicts or lists."""
+    """Write a CSV file from a list or dict of lists or dicts."""
     if sort_columns is None:
         sort_columns = []
     if silently_skip_missing_data and not data:
         return data
-    rows_or_groups = (data.values()
-                      if isinstance(data, dict)
-                      else data)
-    rows = list(operator.add([],
-                             *(list(row)
-                               for row in rows_or_groups))
-                if flatten
-                else rows_or_groups)
-    rows_are_dicts = isinstance(rows[0], dict)
+    rows = (data.values()
+            if isinstance(data, dict)
+            else data)
+    rows_are_dicts = any(dict_rows := [isinstance(row, dict) for row in rows])
+    if rows_are_dicts:
+        assert all(dict_rows)
     if sort_columns:
         rows = sorted(rows, key=lambda row: [row.get(k, "") for k in sort_columns])
     with open_for_write(filename) as outstream:
