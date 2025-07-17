@@ -9,11 +9,11 @@ TABLE_DICT = [
     {'species': 'pringlea antiscorbutica', 'kingdom': 'plant', 'structure': 'herbaceous'},
 ]
 
-ORGANISMS_FILE = "/tmp/organisms.csv"
+ORGANISMS_TABLE_FILE = "/tmp/organisms.csv"
 
-storage.write_csv(ORGANISMS_FILE, TABLE_DICT,
+storage.write_csv(ORGANISMS_TABLE_FILE, TABLE_DICT,
                   sort_columns=['kingdom'])
-animals = storage.read_csv(ORGANISMS_FILE,
+animals = storage.read_csv(ORGANISMS_TABLE_FILE,
                            result_type=dict,
                            key_column='species',
                            transform_row=lambda r: r if r['kingdom'] == 'animal' else None)

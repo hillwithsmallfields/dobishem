@@ -3,7 +3,9 @@ dobishem
 
 My utility code, written to be useful for more than one specific project.
 
-The name is Albanian for "useful"; I wrote the initial version of this code in Albania.
+The name is Albanian for "useful"; there are so many packages called
+"utils", and I wrote the initial version of this code in Albania, so I
+picked a local name to make it easier to spot among all the "utils".
 
 Contains I/O and file-based caching for a start.
 

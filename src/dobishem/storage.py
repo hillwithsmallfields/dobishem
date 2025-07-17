@@ -370,9 +370,9 @@ def combined(
         verbose=False,
         messager=None,
 ):
-    """If any of the origin files have been updated since the destination
-    was, run the combiner function on their contents and write its
-    result to the destination, returning the result.
+    """If any of the origin files have been updated since the
+    destination was, run the combiner function on their contents and
+    write its result to the destination, returning the result.
 
     The 'combiner' argument is a function taking a list of lists,
     typically, the result of reading multiple CSV files, and its
@@ -384,7 +384,16 @@ def combined(
     processing function returns `None`, the row is skipped.
 
     Otherwise, read and return the destination file, applying the
-    'reloader' argument to each entry in it.
+    'reloader' argument to each entry in it, and keeping only the
+    entries for which the 'reloader' returns a non-None value.
+
+    The functions in the 'origins' dictionary, and the 'reloader'
+    function, could typically be used to convert tabular data rows
+    into Python objects.
+
+    Reading and writing of files is done using the 'load' and 'save'
+    functions from this package, which dispatch on the filename
+    extensions.
     """
     return (save(destination,
                  combiner([[entry
@@ -395,13 +404,13 @@ def combined(
                            for origin, converter in origins.items()]),
                  verbose=verbose,
                  messager=messager)
-            if (modified(destination)
-                <= modified(most_recently_modified(origins)))
+            if file_newer_than_file(most_recently_modified(origins),
+                                    destination)
             else [reload_entry
                   for reload_raw in load(destination,
                                          verbose=verbose,
                                          messager=messager)
-                  if (reload_entry := reloader(reload_raw))])
+                  if (reload_entry := reloader(reload_raw)) is not None])
 
 class FileProtection:
 
