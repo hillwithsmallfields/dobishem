@@ -49,18 +49,20 @@ def read_csv(
 
     list: a list of rows (key column is ignored)
     dict: a dictionary of rows, keyed by the key column
-    set:  a dictionary of sets of rows, keyed by the key column
+    set:  a dictionary of sets of rows, keyed by the key column;
+          the rows in each set have the same key, for example all the
+          transactions on the same date; each row is a frozendict
 
-    The elements of the structure are tuples, lists or dicts,
-    according to row_type.
+    The elements of the structure are tuples, lists or dicts (or
+    frozendict, for the set type, as it has to be something that can
+    be put into sets), according to row_type.
 
     The key_column can be a string naming a column if the row_type is
-    dict, or a number if the row_type is list or tuple.
+    dict or set, or a number if the row_type is list or tuple.
 
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
     row.  If it returns a false value for a row, that row is not used.
-
     """
     if not os.path.exists(_expand(filename)):
         if empty_for_missing:
@@ -362,7 +364,7 @@ def most_recently_modified(filenames):
     names = in_modification_order(filenames)
     return names[-1] if names else None
 
-def combined(
+def make(
         destination,
         combiner,
         origins,
