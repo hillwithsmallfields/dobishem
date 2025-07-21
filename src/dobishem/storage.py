@@ -24,16 +24,59 @@ def _expand(filename):
     """Expand environment variables and '`~' in a filename."""
     return os.path.expandvars(os.path.expanduser(filename))
 
+class DirectoryHandler:
+
+    def __init__(self, filename, readable=True, writable=False):
+        self.filename = filename
+        self.readable = readable
+        self.writable = writable
+
+        def __iter__(self):
+            pass                # TODO
+
+        def __contains__(self, key):
+            if not self.readable:
+                raise ....
+            pass                # TODO
+
+        def __getitem__(self, key):
+            if not self.readable:
+                raise ....
+            pass                # TODO
+
+        def __setitem__(self, key, value):
+            if not self.writable:
+                raise ....
+            pass                # TODO
+
+        def update(self, incoming):
+            pass                # TODO
+
+        def __ior__(self, other):
+            pass                # TODO
+        
 def open_for_read(filename, *args, **kwargs):
     """Return an input stream for the named file."""
-    return open(_expand(filename), *args, **kwargs)
+    full_name = _expand(filename)
+    return (DirectoryHandler(full_name)
+            if os.path.isdir(full_name)
+            else open(full_name, *args, **kwargs))
 
-def open_for_write(filename, *args, **kwargs):
+def open_for_write(filename, *args, direction='w', **kwargs):
     """Return an output stream to the named file.
     If necessary, create the directory the file is to go into."""
     full_name = _expand(filename)
     os.makedirs(os.path.dirname(full_name), exist_ok=True)
-    return open(full_name, 'w', *args, **kwargs)
+    return (DirectoryHandler(full_name,
+                             readable=(direction!='w'),
+                             writable=True)
+            if os.path.isdir(full_name)
+            else open(full_name, direction, *args, **kwargs))
+
+def open_for_append(filename, *args, **kwargs):
+    """Return an output stream to append to the named file.
+    If necessary, create the directory the file is to go into."""
+    return open_for_write (filename, *args, direction='a', **kwargs)
 
 def read_csv(
         filename,
