@@ -23,13 +23,13 @@ def read_tabular_to_lists(source):
             if not is_layout(line))
 
 def read_tabular_to_dicts(source):
-    """Read org-mode  tabular text to a list of dicts of cells, and a column order list."""
+    """Read a tabular text to a list of dicts of cells, and a column order list."""
     rows = read_tabular_to_lists(source)
     header = next(rows)
     return ({k: v for k, v in dict(zip(header, row)).items() if v}
             for row in rows), header
 
-def dicts_to_tabular_string(data, column_order=[]):
+def dicts_to_tabular_string(data, column_order=[], margin=""):
     """Convert a list of dicts to a tabular string.
 
     The order of the columns may be specified; otherwise they are sorted by name.
@@ -47,16 +47,21 @@ def dicts_to_tabular_string(data, column_order=[]):
     hline = "|-" + "-+-".join("-" * widths[colname] for colname in all_columns) + "-|"
     formats = {colname: "%%-%ds" % colwidth
                for colname, colwidth in widths.items()}
-    return "\n".join([hline,
-                      "| " + " | ".join([formats[colname] % colname for colname in all_columns]) + " |",
-                      hline]
-                     + ["| " + " | ".join([formats[colname] % row.get(colname, "") for colname in all_columns]) + " |"
-                        for row in as_strings]
-                     + [hline])
+    return (margin
+            + ("\n" + margin).join([hline,
+                                    "| " + " | ".join([formats[colname] % colname for colname in all_columns]) + " |",
+                                    hline]
+                                   + ["| " + " | ".join([formats[colname] % row.get(colname, "") for colname in all_columns]) + " |"
+                                      for row in as_strings]
+                                   + [hline]))
 
-def write_tabular(stream, data, column_order=[]):
+def write_tabular(stream, data, column_order=[], margin=""):
     """Write tabular data to a stream.
 
     See dicts_to_tabular_string for details of column order handling."""
-    stream.write(dicts_to_tabular_string(data, column_order))
+    stream.write(dicts_to_tabular_string(data, column_order, margin))
     return data
+
+def tabular_to_file(filename, data, column_order=[]):
+    with open(filename, 'w') as outstream:
+        write_tabular(outstream, data, column_order)
