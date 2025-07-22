@@ -13,6 +13,9 @@ REFERENCE_AS_SET = defaultdict(set)
 for row in REFERENCE:
     REFERENCE_AS_SET[row['Date']].add(frozendict(row))
 
+DEFAULTS = {}
+TEMPLATES = {'by_place': "%(country)s/%(region)s.json"}
+
 def xrow(row):
     return ({'Date': row['Date'],
             'Item': row['Item'],
@@ -101,3 +104,11 @@ def test_using_files(tmp_path):
         assert instream.read() == "1.7142857142857142\n"
     with open(os.path.join(tmp_path, "mod")) in instream:
         assert instream.read() == "5\n"
+
+def test_template_selection(tmp_path):
+    store = dobishem.storage.Storage(templates=TEMPLATES,
+                                     defaults=DEFAULTS,
+                                     base=tmp_path)
+    store.save(REFERENCE, region="Tiranë", country="Shqiperi")
+    assert dobishem.storage.read_json(
+        os.path.join(tmp_path, "Shqiperi", "Tiranë.json")) == REFERENCE

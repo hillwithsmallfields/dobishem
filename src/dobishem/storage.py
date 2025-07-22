@@ -16,8 +16,10 @@ import json
 import operator
 import os
 import re
-import yaml
 from frozendict import frozendict
+import tempfile
+import yaml
+import dobishem.tabular_text
 
 def _expand(filename):
     """Expand environment variables and '`~' in a filename."""
@@ -43,13 +45,21 @@ def read_csv(
         transform_row=None,
 ):
     """Read a CSV file, returning a structure according to result_type.
-    The result types are:
+
+    The possible result types are:
+
     list: a list of rows (key column is ignored)
     dict: a dictionary of rows, keyed by the key column
-    set: a dictionary of sets of rows, keyed by the key column
+    set:  a dictionary of sets of rows, keyed by the key column;
+          the rows in each set have the same key, for example all the
+          transactions on the same date; each row is a frozendict
 
-    The elements of the structure are tuples, lists or dicts,
-    according to row_type.
+    The elements of the structure are tuples, lists or dicts (or
+    frozendict, for the set type, as it has to be something that can
+    be put into sets), according to row_type.
+
+    The key_column can be a string naming a column if the row_type is
+    dict or set, or a number if the row_type is list or tuple.
 
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
@@ -72,7 +82,9 @@ def read_csv(
         if issubclass(result_type, set):
             result = defaultdict(set)
             for row in rows:
-                result[row[key_column]].add(frozendict(row))
+                result[row[key_column]].add(frozendict(row)
+                                            if issubclass(row_type, dict)
+                                            else tuple(row))
             return result
         return ({row[key_column]: row
                  for row in rows}
@@ -91,26 +103,20 @@ def column_headers(table):
 def write_csv(
         filename,
         data,
-        flatten=False,
         sort_columns=None,
         silently_skip_missing_data=True,
 ):
-    """Write a CSV file from a list or dict of lists or dicts,
-    or, if flatten is true, a dict or list of collections
-    of dicts or lists."""
+    """Write a CSV file from a list or dict of lists or dicts."""
     if sort_columns is None:
         sort_columns = []
     if silently_skip_missing_data and not data:
         return data
-    rows_or_groups = (data.values()
-                      if isinstance(data, dict)
-                      else data)
-    rows = list(operator.add([],
-                             *(list(row)
-                               for row in rows_or_groups))
-                if flatten
-                else rows_or_groups)
-    rows_are_dicts = isinstance(rows[0], dict)
+    rows = (data.values()
+            if isinstance(data, dict)
+            else data)
+    rows_are_dicts = any(dict_rows := [isinstance(row, dict) for row in rows])
+    if rows_are_dicts:
+        assert all(dict_rows)
     if sort_columns:
         rows = sorted(rows, key=lambda row: [row.get(k, "") for k in sort_columns])
     with open_for_write(filename) as outstream:
@@ -143,7 +149,7 @@ def read_json(filename):
 
 def write_json(filename, data):
     """Write a JSON file."""
-    with open_for_read(filename, 'w') as outstream:
+    with open_for_write(filename) as outstream:
         json.dump(data, outstream)
     return data
 
@@ -154,20 +160,34 @@ def read_yaml(filename):
 
 def write_yaml(filename, data):
     """Write a YAML file."""
-    with open_for_read(filename, 'w') as outstream:
+    with open_for_write(filename) as outstream:
         yaml.dump(data, outstream)
+    return data
+
+def read_orgtable(filename):
+    """Read an orgtable file."""
+    with open_for_read(filename) as instream:
+        data, _colnames = dobishem.tabular_text.read_tabular_to_dicts(instream)
+        return list(data)
+
+def write_orgtable(filename, data):
+    """Write an orgtable file."""
+    with open_for_write(filename) as outstream:
+        outstream.write(dobishem.tabular_text.dicts_to_tabular_string(data))
     return data
 
 READERS = {
     ".csv": default_read_csv,
     ".json": read_json,
     ".yaml": read_yaml,
+    ".table": read_orgtable,
     }
 
 WRITERS = {
     ".csv": default_write_csv,
     ".json": write_json,
     ".yaml": write_yaml,
+    ".table": write_orgtable,
     }
 
 def load(
@@ -238,75 +258,107 @@ class DirectoryAsDictionary:
     def update(self, mapping):
         pass
 
+TEMPLATE_PARAM_RE = re.compile("%\\(([a-zA-Z0-9_]+)\\)")
+
 class Storage:
 
     """A storage handler class,
     providing templated filename generation from named parts.
 
+    The templates are Python %-substitution strings with named
+    substitution parameters, and the parameter names should match the
+    kwargs given to methods such as resolve, load, and save.
+
+    For example, a template for a postal address could be:
+
+    "%(housenumber)d %(street)s, %(city)s, %(county)s"
+
+    Templates are chosen to support the kwargs supplied to the methods
+    that use them.
+
     If no template is specified (or the template is `True`)
-    one is chosen by the combination of location keys used."""
+    one is chosen by the combination of location keys used.    """
 
     def __init__(
             self,
             templates,
             defaults,
             base="."):
-        self.templates = templates
-        self.templates_by_keys = {
-            ":".join(sorted(re.findall(r'%\(([a-z_0-9]+)\)', template))): template
-            for template in self.templates.values()}
+        self.templates = {}
+        self.templates_by_params = {}
+        for name, template in templates.items():
+            self.add_template(name, template)
+        print(len(self.templates), "templates by name;", len(self.templates_by_params), "by params")
         self.defaults = defaults
         self.base = base
 
-    def get_template(self, template_name, kwargs):
-        """Look up an explictly specified template by name,
-        or deduce one from the keys used."""
-        return (self.templates_by_keys[":".join(sorted(kwargs.keys()))]
-                if template_name is True
-                else self.templates.get(template_name, 'default'))
+    def add_template(self, name, template):
+        self.templates[name] = template
+        key = self._key_for_template(template)
+        if key in self.templates_by_params:
+            print("Warning: template already defined for", key)
+        self.templates_by_params[key] = template
 
     def resolve(self,
-                template,
-                kwargs):
-        """Resolve a location to a filename string."""
+                **kwargs):
+        """Return the filename string made from the selected template."""
         return _expand(
-            os.path.join(self.base,
-                         self.get_template(template, kwargs) % (self.defaults | kwargs)))
+            os.path.join(
+                self.base,
+                self.template_for_kwargs(kwargs) % (self.defaults | kwargs)))
+
+    def glob(self, pattern, **kwargs):
+        return glob.glob(os.path.join(self.resolve(**kwargs), pattern))
+
+    def template_for_kwargs(self, kwargs):
+        """Choose a template that uses the given parameters."""
+        key = self._params_key(kwargs.keys())
+        if key not in self.templates_by_params:
+            print("Key", key, "not found in template collection")
+            print("Available templates are:")
+            for k in sorted(self.templates_by_params.keys()):
+                print(k, "-->", self.templates_by_params[k])
+            raise KeyError("Template for %s not defined" % key)
+        return self.templates_by_params[key]
 
     @staticmethod
-    def _get_template(raw):
-        return ('absolute' if os.path.isabs(raw) else 'relative') if isinstance(raw, str) else raw.get('template', True)
+    def _params_key(param_names):
+        """Return the key for a collection of parameter names."""
+        return ":".join(sorted(param_names))
 
-    @staticmethod
-    def _get_location(raw):
-        return {'str': raw} if isinstance(raw, str) else {k: v for k, v in raw.items() if k != 'template'}
+    def _key_for_template(self, template):
+        """Make a key from the parameters used in a template.
+        This is used for finding a template to match the given parameters."""
+        return self._params_key([param.group(1)
+                                 for param in TEMPLATE_PARAM_RE.finditer(template)])
 
-    def glob(self, pattern, template, **kwargs):
-        return glob.glob(self.resolve(template, kwargs)+pattern)
+    def open_for_read(self, **kwargs):
+        """Return a file handle suitable for reading."""
+        return open_for_read(self.resolve(**kwargs))
 
-    def open_for_read(self, template, **kwargs):
-        return open_for_read(self.resolve(template, kwargs))
+    def open_for_write(self, **kwargs):
+        """Return a file handle suitable for writing.
+        The directory containing the file will have been created if necessary."""
+        return open_for_write(self.resolve(**kwargs))
 
-    def open_for_write(self, template, **kwargs):
-        return open_for_write(self.resolve(template, kwargs))
+    def load(self, **kwargs):
+        """Read a file using templated name resolution and the generic load function from this module."""
+        return load(self.resolve(**kwargs))
 
-    def load(self, template, **kwargs):
-        return load(self.resolve(template, kwargs))
-
-    def load_from(self, location):
-        return self.load(location.get('template', True),
-                         **self._get_location(location))
-
-    def save(self, data, template, **kwargs):
-        return save(self.resolve(template, kwargs),
+    def save(self, data, **kwargs):
+        """Write a file using templated name resolution and the generic save function from this module."""
+        return save(self.resolve(**kwargs),
                     data)
 
-    def save_to(self, data, location):
-        return self.save(data,
-                         location.get('template', True),
-                         **self._get_location(location))
-
 class UsingFiles(Storage):
+
+    """A class to iterate over input and output files.
+    Contrived example:
+
+    filer = UsingFiles(inputs=("in0.json", "in1.csv", "in2.yaml"),
+                       outputs=("out0.csv", "out1.yaml"))
+    filer.save(*my_function(*filer))
+    """
 
     def __init__(self, inputs, outputs, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -319,14 +371,11 @@ class UsingFiles(Storage):
 
     def __next__(self):
         for location in self.inputs:
-            print("input location", location)
-            yield self.load_from(location)
-        raise StopIteration
+            yield self.load(location)
 
     def save(self, *values):
-        for location, content in zip(self.outputs, values).items():
-            print("writing to", location)
-            self.save_to(content, location)
+        for location, content in zip(self.outputs, values):
+            self.save(content, location)
 
     def __enter__(self):
         print("UsingFiles entering with inputs", self.inputs, "and outputs", self.outputs)
@@ -340,18 +389,18 @@ def function_cached_with_file(function, filename):
     """Read a file and return its contents.
     If the file does not exist, run a function to create the contents,
     write them to the file, and return them."""
-    filename = _expand(filename)
     return (load(filename)
-            if os.path.exists(filename)
+            if os.path.exists(filename := _expand(filename))
             else save(filename, function()))
 
 def modified(filename):
     """Return the modification time of a file.
     If the file does not exist, the epoch is returned."""
-    if filename is None:
-        return 0
-    fname = _expand(filename)
-    return os.path.getmtime(fname) if os.path.exists(fname) else 0
+    return (0
+            if filename is None
+            else (os.path.getmtime(fname)
+                  if os.path.exists(fname := _expand(filename))
+                  else 0))
 
 def file_newer_than_file(a, b):
     return os.path.getmtime(_expand(a)) > os.path.getmtime(_expand(b))
@@ -360,16 +409,17 @@ def in_modification_order(filenames):
     """"Return a list of filenames sorted into modification order.
     If the filenames are given as a string rather than a list,
     apply shell-style globbing to convert it to a list."""
-    if isinstance(filenames, str):
-        filenames = glob.glob(_expand(filenames))
-    return sorted(filenames, key=modified)
+    return sorted((glob.glob(_expand(filenames))
+                   if isinstance(filenames, str)
+                   else filenames),
+                  key=modified)
 
 def most_recently_modified(filenames):
     """Return the most recently modified of a list of files."""
     names = in_modification_order(filenames)
     return names[-1] if names else None
 
-def combined(
+def make(
         destination,
         combiner,
         origins,
@@ -377,9 +427,9 @@ def combined(
         verbose=False,
         messager=None,
 ):
-    """If any of the origin files have been updated since the destination
-    was, run the combiner function on their contents and write its
-    result to the destination, returning the result.
+    """If any of the origin files have been updated since the
+    destination was, run the combiner function on their contents and
+    write its result to the destination, returning the result.
 
     The 'combiner' argument is a function taking a list of lists,
     typically, the result of reading multiple CSV files, and its
@@ -391,7 +441,16 @@ def combined(
     processing function returns `None`, the row is skipped.
 
     Otherwise, read and return the destination file, applying the
-    'reloader' argument to each entry in it.
+    'reloader' argument to each entry in it, and keeping only the
+    entries for which the 'reloader' returns a non-None value.
+
+    The functions in the 'origins' dictionary, and the 'reloader'
+    function, could typically be used to convert tabular data rows
+    into Python objects.
+
+    Reading and writing of files is done using the 'load' and 'save'
+    functions from this package, which dispatch on the filename
+    extensions.
     """
     return (save(destination,
                  combiner([[entry
@@ -402,13 +461,13 @@ def combined(
                            for origin, converter in origins.items()]),
                  verbose=verbose,
                  messager=messager)
-            if (modified(destination)
-                < modified(most_recently_modified(origins)))
+            if file_newer_than_file(most_recently_modified(origins),
+                                    destination)
             else [reload_entry
                   for reload_raw in load(destination,
                                          verbose=verbose,
                                          messager=messager)
-                  if (reload_entry := reloader(reload_raw))])
+                  if (reload_entry := reloader(reload_raw)) is not None])
 
 class FileProtection:
 
