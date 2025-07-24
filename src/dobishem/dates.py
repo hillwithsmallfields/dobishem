@@ -86,6 +86,8 @@ def yesterday():
 
 def entries_between_dates(incoming, starting, ending):
     "Return the entries in a list that are between two given dates."
+    if not incoming:
+        return []
     starting = as_date(starting)
     ending = as_date(ending)
     return [entry

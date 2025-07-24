@@ -1,12 +1,38 @@
 #!/usr/bin/env python3
 
+import tempfile
+
 from dobishem import storage
+
+etc = storage.DirectoryAsDictionary("/etc")
+
+print("There are", len(etc), "entries in /etc")
+print(list(etc.keys()))
+print("The contents of /etc/crontab:", etc["crontab"])
+print("The contents of /etc/X11", etc["X11"])
+print("Whether /etc contains passwd:", "passwd" in etc)
+
+with tempfile.TemporaryDirectory() as tempdirname:
+    tempdir = storage.DirectoryAsDictionary(tempdirname, writable=True)
+    for name in ['crontab', 'group', 'hosts', 'motd', 'passwd']:
+        tempdir[name] = etc[name]
+    print("The temporary directory is", tempdirname, "and it contains", len(tempdir), "entries")
+    for k, v in tempdir.items():
+        print("----------------")
+        print(k)
+        print(v)
+    print("----------------")
+
 
 TABLE_DICT = [
     {'species': 'felis catus', 'kingdom': 'animal', 'structure': 'quadruped'},
     {'species': 'amoeba proteus', 'kingdom': 'protist', 'structure': 'unicellular'},
     {'species': 'octopus vulgaris', 'kingdom': 'animal', 'structure': 'cephalopod'},
     {'species': 'pringlea antiscorbutica', 'kingdom': 'plant', 'structure': 'herbaceous'},
+    {'species': 'loxodonta africana', 'kingdom': 'animal', 'structure': 'quadruped'},
+    {'species': 'muntiacus reevesi', 'kingdom': 'animal', 'structure': 'quadruped'},
+    {'species': 'arabidopsis thaliana', 'kingdom': 'plant', 'structure': 'herbaceous'},
+    {'species': 'quercus robur', 'kingdom': 'plant', 'structure': 'woody'},
 ]
 
 ORGANISMS_TABLE_FILE = "/tmp/organisms.csv"

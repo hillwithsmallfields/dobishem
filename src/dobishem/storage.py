@@ -19,47 +19,100 @@ import re
 from frozendict import frozendict
 import tempfile
 import yaml
+
 import dobishem.tabular_text
 
 def _expand(filename):
     """Expand environment variables and '`~' in a filename."""
     return os.path.expandvars(os.path.expanduser(filename))
 
-class DirectoryHandler:
+class DirectoryIter:
 
-    def __init__(self, filename, readable=True, writable=False):
-        self.filename = filename
+    def __init__(self, directory):
+        self.directory = directory
+        self.filenames = directory.filenames.copy()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        print("in __next__, filenames are", self.filenames)
+        if self.filenames:
+            name = os.path.join(self.directory.dirname, self.filenames.pop())
+            yield name, (self.directory.storage.load(name)
+                         if self.directory.storage
+                         else load(name))
+        raise StopIteration
+
+class DirectoryAsDictionary:
+
+    def __init__(self, dirname,
+                 storage=None,
+                 readable=True, writable=False):
+        self.dirname = dirname
+        self.filenames = []
+        self.storage = storage
         self.readable = readable
         self.writable = writable
+        self.__update__listing__()
 
-        def __iter__(self):
-            pass                # TODO
+    def __update__listing__(self):
+        self.filenames = sorted(os.listdir(self.dirname))
 
-        def __contains__(self, key):
-            if not self.readable:
-                raise ....
-            pass                # TODO
+    def __iter__(self):
+        self.__update__listing__()
+        return DirectoryIter(self)
 
-        def __getitem__(self, key):
-            if not self.readable:
-                raise ....
-            pass                # TODO
+    def __len__(self):
+        self.__update__listing__()
+        return len(self.filenames)
 
-        def __setitem__(self, key, value):
-            if not self.writable:
-                raise ....
-            pass                # TODO
+    def items(self):
+        self.__update__listing__()
+        return self.__iter__()
 
-        def update(self, incoming):
-            pass                # TODO
+    def keys(self):
+        self.__update__listing__()
+        return self.filenames
 
-        def __ior__(self, other):
-            pass                # TODO
-        
+    def __contains__(self, key):
+        if not self.readable:
+            raise TypeError("This DirectoryAsDictionary object is not readable")
+        self.__update__listing__()
+        return key in self.filenames
+
+    def __getitem__(self, key):
+        if not self.readable:
+            raise TypeError("This DirectoryAsDictionary object is not readable")
+        self.__update__listing__()
+        if key not in self.filenames:
+            raise FileNotFoundError("No such file or directory: " + key)
+        fullname = os.path.join(self.dirname, key)
+        return (self.storage.load(fullname)
+                if self.storage
+                else load(fullname))
+
+    def __setitem__(self, key, value):
+        if not self.writable:
+            raise TypeError("This DirectoryAsDictionary object is not writable")
+        fullname = os.path.join(self.dirname, key)
+        if self.storage:
+            self.storage.save(fullname, value)
+        else:
+            save(fullname, value)
+
+    def update(self, mapping):
+        for k, v in mapping.items():
+            self[k] = v
+
+    def __ior__(self, other):
+        for k, v in mapping.items():
+            self[k] = v
+
 def open_for_read(filename, *args, **kwargs):
     """Return an input stream for the named file."""
     full_name = _expand(filename)
-    return (DirectoryHandler(full_name)
+    return (DirectoryAsDictionary(full_name)
             if os.path.isdir(full_name)
             else open(full_name, *args, **kwargs))
 
@@ -68,16 +121,16 @@ def open_for_write(filename, *args, direction='w', **kwargs):
     If necessary, create the directory the file is to go into."""
     full_name = _expand(filename)
     os.makedirs(os.path.dirname(full_name), exist_ok=True)
-    return (DirectoryHandler(full_name,
-                             readable=(direction!='w'),
-                             writable=True)
+    return (DirectoryAsDictionary(full_name,
+                                  readable=(direction!='w'),
+                                  writable=True)
             if os.path.isdir(full_name)
             else open(full_name, direction, *args, **kwargs))
 
 def open_for_append(filename, *args, **kwargs):
     """Return an output stream to append to the named file.
     If necessary, create the directory the file is to go into."""
-    return open_for_write (filename, *args, direction='a', **kwargs)
+    return open_for_write(filename, *args, direction='a', **kwargs)
 
 def read_csv(
         filename,
@@ -219,6 +272,18 @@ def write_orgtable(filename, data):
         outstream.write(dobishem.tabular_text.dicts_to_tabular_string(data))
     return data
 
+def read_default(filename):
+    if os.path.isdir(filename):
+        return DirectoryAsDictionary(filename,
+                                     writable=os.access(filename, os.W_OK))
+    with open_for_read(filename) as instream:
+        return instream.read()
+
+def write_default(filename, data):
+    with open_for_write(filename) as outstream:
+        outstream.write(data)
+    return data
+
 READERS = {
     ".csv": default_read_csv,
     ".json": read_json,
@@ -244,7 +309,8 @@ def load(
             messager.print(f"Reading {filename}")
         else:
             print("Reading", filename)
-    return READERS[os.path.splitext(filename)[1]](filename)
+    return READERS.get(os.path.splitext(filename)[1],
+                       read_default)(filename)
 
 def save(
         filename,
@@ -258,48 +324,8 @@ def save(
             messager.print(f"Writing {filename}")
         else:
             print("Writing", filename)
-    return WRITERS[os.path.splitext(filename)[1]](filename, data)
-
-class DirectoryIter:
-
-    def __init__(self, directory):
-        self.directory = directory
-        self.files = directory.contents.copy()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self.files:
-            name = self.files.pop()
-            return name, self.directory.storage.load(self.directory.template, name)
-        raise StopIteration
-
-class DirectoryAsDictionary:
-
-    def __init__(self, storage, template, dirname):
-        self.storage = storage
-        self.template = template
-        self.dirname = dirname
-        self.contents = sorted(os.listdir(dirname))
-
-    def __iter__(self):
-        return DirectoryIter(self)
-
-    def items(self):
-        return self.__iter__()
-
-    def __getitem__(self, value):
-        pass
-
-    def __setitem__(self, key, value):
-        pass
-
-    def __contains__(self, key):
-        pass
-
-    def update(self, mapping):
-        pass
+    return WRITERS.get(os.path.splitext(filename)[1],
+                       write_default)(filename, data)
 
 TEMPLATE_PARAM_RE = re.compile("%\\(([a-zA-Z0-9_]+)\\)")
 
@@ -384,13 +410,15 @@ class Storage:
         The directory containing the file will have been created if necessary."""
         return open_for_write(self.resolve(**kwargs))
 
-    def load(self, **kwargs):
-        """Read a file using templated name resolution and the generic load function from this module."""
-        return load(self.resolve(**kwargs))
+    def load(self, fname=None, **kwargs):
+        """Read a file using templated name resolution and the generic load function from this module.
+        If a filename is given, it is used instead of the template system."""
+        return load(fname or self.resolve(**kwargs))
 
-    def save(self, data, **kwargs):
-        """Write a file using templated name resolution and the generic save function from this module."""
-        return save(self.resolve(**kwargs),
+    def save(self, data, fname=None, **kwargs):
+        """Write a file using templated name resolution and the generic save function from this module.
+        If a filename is given, it is used instead of the template system."""
+        return save(fname or self.resolve(**kwargs),
                     data)
 
 class UsingFiles(Storage):
