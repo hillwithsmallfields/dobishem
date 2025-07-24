@@ -26,23 +26,24 @@ def _expand(filename):
     """Expand environment variables and '`~' in a filename."""
     return os.path.expandvars(os.path.expanduser(filename))
 
-class DirectoryIter:
+# class DirectoryIter:
 
-    def __init__(self, directory):
-        self.directory = directory
-        self.filenames = directory.filenames.copy()
+#     def __init__(self, directory):
+#         self.directory = directory
+#         self.filenames = directory.filenames.copy()
 
-    def __iter__(self):
-        return self
+#     def __iter__(self):
+#         return self
 
-    def __next__(self):
-        print("in __next__, filenames are", self.filenames)
-        if self.filenames:
-            name = os.path.join(self.directory.dirname, self.filenames.pop())
-            yield name, (self.directory.storage.load(name)
-                         if self.directory.storage
-                         else load(name))
-        raise StopIteration
+#     def __next__(self):
+#         for filename in self.filenames:
+#             name = os.path.join(self.directory.dirname, filename)
+#             data = (self.directory.storage.load(name)
+#                     if self.directory.storage
+#                     else load(name))
+#             print("__next__ yielding", name, data)
+#             yield name, data
+#         raise StopIteration
 
 class DirectoryAsDictionary:
 
@@ -59,9 +60,20 @@ class DirectoryAsDictionary:
     def __update__listing__(self):
         self.filenames = sorted(os.listdir(self.dirname))
 
+    def __next__(self):
+        print("iterating over", self.filenames)
+        for filename in self.filenames:
+            name = os.path.join(self.dirname, filename)
+            data = (self.storage.load(name)
+                    if self.storage
+                    else load(name))
+            print("__next__ yielding", name, "and", len(data), "bytes")
+            yield name, data
+        raise StopIteration
+
     def __iter__(self):
         self.__update__listing__()
-        return DirectoryIter(self)
+        return self
 
     def __len__(self):
         self.__update__listing__()

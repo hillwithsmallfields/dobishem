@@ -14,15 +14,16 @@ print("Whether /etc contains passwd:", "passwd" in etc)
 
 with tempfile.TemporaryDirectory() as tempdirname:
     tempdir = storage.DirectoryAsDictionary(tempdirname, writable=True)
-    for name in ['crontab', 'group', 'hosts', 'motd', 'passwd']:
+    for name in ['crontab', 'group', 'hosts', 'motd', 'passwd', 'resolv.conf']:
         tempdir[name] = etc[name]
     print("The temporary directory is", tempdirname, "and it contains", len(tempdir), "entries")
     for k, v in tempdir.items():
         print("----------------")
         print(k)
-        print(v)
+        print("================")
+        print(len(v))
+        break
     print("----------------")
-
 
 TABLE_DICT = [
     {'species': 'felis catus', 'kingdom': 'animal', 'structure': 'quadruped'},
