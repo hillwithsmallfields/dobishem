@@ -61,6 +61,7 @@ class DirectoryAsDictionary:
         self.filenames = sorted(os.listdir(self.dirname))
 
     def __next__(self):
+        print("in DirectoryAsDictionary.__next__")
         print("iterating over", self.filenames)
         for filename in self.filenames:
             name = os.path.join(self.dirname, filename)
@@ -69,19 +70,26 @@ class DirectoryAsDictionary:
                     else load(name))
             print("__next__ yielding", name, "and", len(data), "bytes")
             yield name, data
-        raise StopIteration
 
     def __iter__(self):
+        print("in DirectoryAsDictionary.__iter__")
         self.__update__listing__()
-        return self
+        return self.__next__()
 
     def __len__(self):
         self.__update__listing__()
         return len(self.filenames)
 
     def items(self):
-        self.__update__listing__()
-        return self.__iter__()
+        print("in DirectoryAsDictionary.items iterating over", self.filenames)
+        for filename in self.filenames:
+            name = os.path.join(self.dirname, filename)
+            data = (self.storage.load(name)
+                    if self.storage
+                    else load(name))
+            print("items yielding", name, "and", len(data), "bytes")
+            yield name, data
+        # return self.__iter__()
 
     def keys(self):
         self.__update__listing__()
@@ -362,15 +370,16 @@ class Storage:
 
     def __init__(
             self,
-            templates,
-            defaults,
+            templates=None,
+            defaults=None,
             base="."):
         self.templates = {}
         self.templates_by_params = {}
-        for name, template in templates.items():
-            self.add_template(name, template)
-        print(len(self.templates), "templates by name;", len(self.templates_by_params), "by params")
-        self.defaults = defaults
+        if templates:
+            for name, template in templates.items():
+                self.add_template(name, template)
+            print(len(self.templates), "templates by name;", len(self.templates_by_params), "by params")
+        self.defaults = defaults or {}
         self.base = base
 
     def add_template(self, name, template):

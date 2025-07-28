@@ -4,6 +4,10 @@ import tempfile
 
 from dobishem import storage
 
+###############################
+# Directories as dictionaries #
+###############################
+
 etc = storage.DirectoryAsDictionary("/etc")
 
 print("There are", len(etc), "entries in /etc")
@@ -17,13 +21,26 @@ with tempfile.TemporaryDirectory() as tempdirname:
     for name in ['crontab', 'group', 'hosts', 'motd', 'passwd', 'resolv.conf']:
         tempdir[name] = etc[name]
     print("The temporary directory is", tempdirname, "and it contains", len(tempdir), "entries")
+    print("The entry names are", tempdir.keys())
+
+    for kv in tempdir.items():
+        print("kv is", kv)
+        # for a in kv:
+        #     print(" got", a, "from kv")
+        # k, v = kv
+        # print("k is", k, "and v is", v)
+
     for k, v in tempdir.items():
         print("----------------")
         print(k)
         print("================")
-        print(len(v))
+        print(v)
         break
     print("----------------")
+
+################
+# Tabular data #
+################
 
 TABLE_DICT = [
     {'species': 'felis catus', 'kingdom': 'animal', 'structure': 'quadruped'},
