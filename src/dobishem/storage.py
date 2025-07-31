@@ -9,8 +9,6 @@ All the functions using filenames expand environment variables and '~'
 in the names.
 """
 
-from collections import defaultdict
-from frozendict import frozendict
 import csv
 import glob
 import json
@@ -18,6 +16,10 @@ import os
 import re
 import tempfile
 import yaml
+
+from collections import defaultdict
+from frozendict import frozendict
+
 import dobishem.tabular_text
 
 def _expand(filename):
@@ -35,18 +37,18 @@ class DirectoryHandler:
             pass                # TODO
 
         def __contains__(self, key):
-            if not self.readable:
-                raise ....
+            # if not self.readable:
+            #     raise ....
             pass                # TODO
 
         def __getitem__(self, key):
-            if not self.readable:
-                raise ....
+            # if not self.readable:
+            #     raise ....
             pass                # TODO
 
         def __setitem__(self, key, value):
-            if not self.writable:
-                raise ....
+            # if not self.writable:
+            #     raise ....
             pass                # TODO
 
         def update(self, incoming):
@@ -54,7 +56,7 @@ class DirectoryHandler:
 
         def __ior__(self, other):
             pass                # TODO
-        
+
 def open_for_read(filename, *args, **kwargs):
     """Return an input stream for the named file."""
     full_name = _expand(filename)
@@ -77,6 +79,36 @@ def open_for_append(filename, *args, **kwargs):
     """Return an output stream to append to the named file.
     If necessary, create the directory the file is to go into."""
     return open_for_write (filename, *args, direction='a', **kwargs)
+
+def row_key(key_column, row):
+    """Return a key for the given row, according to the key_column.
+
+    The key_column may be:
+
+    - a name, if the row is a dictionary (as from csv.DictReader)
+
+    - an integer, if the row is a list (as from csv.reader)
+
+    - a tuple or list of names or integers, in which case the key is a
+      tuple of those column values, in that order
+
+    - a function, which is applied to the row to get the key
+
+    - - if the row is a dictionary, it is exploded into separate
+        arguments with ** (in which case the function should have the
+        same argument names as the column names, and discard extra
+        columns with **_);
+
+    - - otherwise the row is passed to the function as its only
+        argument
+    """
+    return ((key_column(**row)
+             if isinstance(row, dict)
+             else key_column(row))
+            if callable(key_column)
+            else ((tuple(row[k] for k in key_column)
+                   if isinstance(key_column, (tuple, list))
+                   else row[key_column])))
 
 def read_csv(
         filename,
@@ -101,7 +133,8 @@ def read_csv(
     be put into sets), according to row_type.
 
     The key_column can be a string naming a column if the row_type is
-    dict or set, or a number if the row_type is list or tuple.
+    dict or set, or a number if the row_type is list or tuple; see
+    documentation of row_key for further possibilities.
 
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
@@ -124,11 +157,11 @@ def read_csv(
         if issubclass(result_type, set):
             result = defaultdict(set)
             for row in rows:
-                result[row[key_column]].add(frozendict(row)
-                                            if issubclass(row_type, dict)
-                                            else tuple(row))
+                result[row_key(key_column, row)].add(frozendict(row)
+                                                     if issubclass(row_type, dict)
+                                                     else tuple(row))
             return result
-        return ({row[key_column]: row
+        return ({row_key(key_column, row): row
                  for row in rows}
                 if issubclass(result_type, dict)
                 else rows)
@@ -148,7 +181,18 @@ def write_csv(
         sort_columns=None,
         silently_skip_missing_data=True,
 ):
-    """Write a CSV file from a list or dict of lists or dicts."""
+    """Write a CSV file from a list or dict of lists or dicts.
+    Returns the data, so it can be used as a pass-through function.
+
+    If sort_columns is given, it controls the order in which the rows
+    appear in the file.  It can be a list of column names used to
+    construct a sorting key, or a function to apply to each row to
+    create the sorting key.
+
+    If silently_skip_missing_data is given, if the data is empty, no
+    file is written (leaving any previous file of that name
+    undisturbed).
+    """
     if sort_columns is None:
         sort_columns = []
     if silently_skip_missing_data and not data:
@@ -160,7 +204,10 @@ def write_csv(
     if rows_are_dicts:
         assert all(dict_rows)
     if sort_columns:
-        rows = sorted(rows, key=lambda row: [row.get(k, "") for k in sort_columns])
+        rows = sorted(rows, key=(sort_columns
+                                 if callable(sort_columns)
+                                 else lambda row: [row.get(k, "")
+                                                   for k in sort_columns]))
     with open_for_write(filename) as outstream:
         writer = (csv.DictWriter(outstream,
                                  fieldnames=(sort_columns
@@ -292,6 +339,7 @@ class Storage:
         self.base = base
 
     def add_template(self, name, template):
+        """Add a named template to this storage handler."""
         self.templates[name] = template
         key = self._key_for_template(template)
         if key in self.templates_by_params:
@@ -307,6 +355,8 @@ class Storage:
                 self.template_for_kwargs(kwargs) % (self.defaults | kwargs)))
 
     def glob(self, pattern, **kwargs):
+        """Return the names of files matching the instantiated template
+        for the given kwargs."""
         return glob.glob(os.path.join(self.resolve(**kwargs), pattern))
 
     def template_for_kwargs(self, kwargs):
@@ -390,8 +440,13 @@ def modified(filename):
                   if os.path.exists(fname := _expand(filename))
                   else 0))
 
-def file_newer_than_file(a, b):
-    return os.path.getmtime(_expand(a)) > os.path.getmtime(_expand(b))
+def file_newer_than_file(this, that):
+    """Compare dates of file updates.
+
+    Returns whether the file named by the first argument has been
+    updated more recently than the one named by the second argument.
+    """
+    return os.path.getmtime(_expand(this)) > os.path.getmtime(_expand(that))
 
 def in_modification_order(filenames):
     """"Return a list of filenames sorted into modification order.
