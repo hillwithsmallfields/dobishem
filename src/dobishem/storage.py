@@ -70,7 +70,7 @@ def open_for_write(filename, *args, direction='w', **kwargs):
     full_name = _expand(filename)
     os.makedirs(os.path.dirname(full_name), exist_ok=True)
     return (DirectoryHandler(full_name,
-                             readable=(direction!='w'),
+                             readable=(direction[0]!='w'),
                              writable=True)
             if os.path.isdir(full_name)
             else open(full_name, direction, *args, **kwargs))
@@ -321,6 +321,16 @@ def write_orgtable(filename, data):
         outstream.write(dobishem.tabular_text.dicts_to_tabular_string(data))
     return data
 
+def read_binary(filename):
+    """Read a file as a byte array."""
+    with open_for_read(filename, 'rb') as instream:
+        return instream.read()
+
+def write_binary(filename, data):
+    """Write a file from a byte array."""
+    with open_for_write(filename, direction='wb') as outstream:
+        outstream.write(data)
+
 READERS = {
     ".csv": default_read_csv,
     ".json": read_json,
@@ -348,7 +358,8 @@ def load(
             messager.print(f"Reading {filename}")
         else:
             print("Reading", filename)
-    return READERS[os.path.splitext(filename)[1]](filename)
+    return READERS.get(os.path.splitext(filename)[1],
+                       read_binary)(filename)
 
 def save(
         filename,
@@ -362,7 +373,8 @@ def save(
             messager.print(f"Writing {filename}")
         else:
             print("Writing", filename)
-    return WRITERS[os.path.splitext(filename)[1]](filename, data)
+    return WRITERS.get(os.path.splitext(filename)[1],
+                       write_binary)(filename, data)
 
 TEMPLATE_PARAM_RE = re.compile("%\\(([a-zA-Z0-9_]+)\\)")
 
