@@ -384,7 +384,6 @@ def write_text(filename, data):
         outstream.write('\n')
     return data
 
-def read_pickle(filename):
     """Read a Python pickle file."""
     with open_for_read(filename) as instream:
         return pickle.load(instream)
