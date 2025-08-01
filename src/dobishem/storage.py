@@ -19,6 +19,7 @@ import yaml
 
 from collections import defaultdict
 from frozendict import frozendict
+import pickle
 
 import dobishem.tabular_text
 
@@ -309,6 +310,17 @@ def write_text(filename, data):
         outstream.write('\n')
     return data
 
+def read_pickle(filename):
+    """Read a Python pickle file."""
+    with open_for_read(filename) as instream:
+        return pickle.load(instream)
+
+def write_pickle(filename, data):
+    """Write data to a Python pickle file."""
+    with open_for_write(filename) as outstream:
+        pickle.dump(data, outstream)
+    return data
+
 def read_orgtable(filename):
     """Read an orgtable file."""
     with open_for_read(filename) as instream:
@@ -337,6 +349,7 @@ READERS = {
     ".json": read_json,
     ".yaml": read_yaml,
     ".txt": read_text,
+    ".pkl": read_pickle,
     ".table": read_orgtable,
     }
 
@@ -345,6 +358,7 @@ WRITERS = {
     ".json": write_json,
     ".yaml": write_yaml,
     ".txt": write_text,
+    ".pkl": write_pickle,
     ".table": write_orgtable,
     }
 
