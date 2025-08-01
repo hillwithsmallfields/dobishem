@@ -110,11 +110,31 @@ def row_key(key_column, row):
                    if isinstance(key_column, (tuple, list))
                    else row[key_column])))
 
+def strip_row(row, key_column=None, remove_blanks=False):
+    """Return a stripped row.
+
+    If key_column is given, it is removed from the row.
+
+    If remove_blanks is given, cells blank strings are omitted from
+    the result if it is a dictionary, or replaced with None if it is
+    list.
+    """
+    return ({k: v
+             for k, v in row.items()
+             if not ((key_column and k == key_column)
+                     or (remove_blanks and v == ""))}
+            if isinstance(row, dict)
+            else [(k if k != "" else None) if remove_blanks else k
+                  for i, k in enumerate(row)
+                  if i != key_column])
+
 def read_csv(
         filename,
         result_type=list,
         row_type=dict,
         key_column=None,
+        strip_key=False,
+        remove_blanks=False,
         empty_for_missing=True,
         transform_row=None,
 ):
@@ -131,6 +151,12 @@ def read_csv(
     The elements of the structure are tuples, lists or dicts (or
     frozendict, for the set type, as it has to be something that can
     be put into sets), according to row_type.
+
+    If strip_key is given, the key data is removed from each row.
+
+    If remove_blanks is given, cells blank strings are omitted from
+    the result if it is a dictionary, or replaced with None if it is
+    list.
 
     The key_column can be a string naming a column if the row_type is
     dict or set, or a number if the row_type is list or tuple; see
@@ -157,11 +183,16 @@ def read_csv(
         if issubclass(result_type, set):
             result = defaultdict(set)
             for row in rows:
-                result[row_key(key_column, row)].add(frozendict(row)
-                                                     if issubclass(row_type, dict)
-                                                     else tuple(row))
+                result[row_key(key_column, row)].add(
+                    frozendict(strip_row(row,
+                                         key_column=strip_key and key_column,
+                                         remove_blanks=remove_blanks))
+                    if issubclass(row_type, dict)
+                    else tuple(row))
             return result
-        return ({row_key(key_column, row): row
+        return ({row_key(key_column, row): strip_row(row,
+                                                     key_column=strip_key and key_column,
+                                                     remove_blanks=remove_blanks)
                  for row in rows}
                 if issubclass(result_type, dict)
                 else rows)
