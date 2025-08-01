@@ -153,6 +153,7 @@ def read_csv(
     be put into sets), according to row_type.
 
     If strip_key is given, the key data is removed from each row.
+    This is the counterpart of add_dict_keys in write_csv.
 
     If remove_blanks is given, cells blank strings are omitted from
     the result if it is a dictionary, or replaced with None if it is
@@ -165,6 +166,7 @@ def read_csv(
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
     row.  If it returns a false value for a row, that row is not used.
+
     """
     if not os.path.exists(_expand(filename)):
         if empty_for_missing:
@@ -210,6 +212,7 @@ def write_csv(
         filename,
         data,
         sort_columns=None,
+        add_dict_keys=False,
         silently_skip_missing_data=True,
 ):
     """Write a CSV file from a list or dict of lists or dicts.
@@ -220,15 +223,23 @@ def write_csv(
     construct a sorting key, or a function to apply to each row to
     create the sorting key.
 
+    If add_dict_keys is given (which is only valid if the data is a
+    dict of dicts) the dictionary keys are added to the rows, using
+    the value of add_dict_keys as the column name.  This is the
+    counterpart of strip_key in read_csv.
+
     If silently_skip_missing_data is given, if the data is empty, no
     file is written (leaving any previous file of that name
     undisturbed).
+
     """
     if sort_columns is None:
         sort_columns = []
     if silently_skip_missing_data and not data:
         return data
-    rows = (data.values()
+    rows = (([v | {add_dict_keys: k} for k, v in data]
+             if add_dict_keys
+             else data.values())
             if isinstance(data, dict)
             else data)
     rows_are_dicts = any(dict_rows := [isinstance(row, dict) for row in rows])
