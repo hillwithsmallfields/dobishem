@@ -241,6 +241,7 @@ def read_csv(
     If a function is given for the transform_row argument, it is
     called on each row, and its result is used instead of the original
     row.  If it returns a false value for a row, that row is not used.
+
     """
     if not os.path.exists(_expand(filename)):
         if empty_for_missing:
@@ -305,6 +306,7 @@ def write_csv(
     If silently_skip_missing_data is given, if the data is empty, no
     file is written (leaving any previous file of that name
     undisturbed).
+
     """
     if sort_columns is None:
         sort_columns = []
