@@ -295,6 +295,20 @@ def write_yaml(filename, data):
         yaml.dump(data, outstream)
     return data
 
+def read_text(filename):
+    """Read a text file into a list of lines.
+    Newlines are removed."""
+    with open_for_read(filename) as instream:
+        return [line.rstrip('\n') for line in instream]
+
+def write_text(filename, data):
+    """Write a list of lines into a text file.
+    Newlines are inserted between the lines, and at the end."""
+    with open_for_write(filename) as outstream:
+        outstream.write('\n'.join(data))
+        outstream.write('\n')
+    return data
+
 def read_orgtable(filename):
     """Read an orgtable file."""
     with open_for_read(filename) as instream:
@@ -311,6 +325,7 @@ READERS = {
     ".csv": default_read_csv,
     ".json": read_json,
     ".yaml": read_yaml,
+    ".txt": read_text,
     ".table": read_orgtable,
     }
 
@@ -318,6 +333,7 @@ WRITERS = {
     ".csv": default_write_csv,
     ".json": write_json,
     ".yaml": write_yaml,
+    ".txt": write_text,
     ".table": write_orgtable,
     }
 
