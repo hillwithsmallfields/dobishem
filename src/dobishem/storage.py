@@ -330,6 +330,7 @@ def write_binary(filename, data):
     """Write a file from a byte array."""
     with open_for_write(filename, direction='wb') as outstream:
         outstream.write(data)
+    return data
 
 READERS = {
     ".csv": default_read_csv,
