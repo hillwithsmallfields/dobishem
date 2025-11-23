@@ -621,7 +621,10 @@ def file_newer_than_file(this, that):
     Returns whether the file named by the first argument has been
     updated more recently than the one named by the second argument.
     """
-    return os.path.getmtime(_expand(this)) > os.path.getmtime(_expand(that))
+    return (os.path.getmtime(_expand(this)) > os.path.getmtime(_expand(that))
+            if this and that    # if both exist
+            else this           # this is probably most make-like
+            )
 
 def in_modification_order(filenames):
     """"Return a list of filenames sorted into modification order.
