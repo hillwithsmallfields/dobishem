@@ -143,7 +143,9 @@ def open_for_write(filename, *args, direction='w', **kwargs):
     """Return an output stream to the named file.
     If necessary, create the directory the file is to go into."""
     full_name = _expand(filename)
-    os.makedirs(os.path.dirname(full_name), exist_ok=True)
+    directory = os.path.dirname(full_name)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
     return (DirectoryAsDictionary(full_name,
                                   readable=(direction!='w'),
                                   writable=True)
