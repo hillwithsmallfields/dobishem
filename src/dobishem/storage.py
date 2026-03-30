@@ -577,12 +577,18 @@ class UsingFiles(Storage):
         return self
 
     def __next__(self):
-        for location in self.inputs:
-            yield self.load(location)
+        if self.inputs:
+            for location in self.inputs:
+                print("loading from location", location)
+                yield self.load(location)
+        else:
+            raise StopIteration    
 
     def save(self, *values):
-        for location, content in zip(self.outputs, values):
-            self.save(content, location)
+        if self.outputs:
+            for location, content in zip(self.outputs, values):
+                print("writing output", type(content), "to location", location)
+                self.save(content, location)
 
     def __enter__(self):
         print("UsingFiles entering with inputs", self.inputs, "and outputs", self.outputs)
