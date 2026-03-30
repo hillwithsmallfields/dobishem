@@ -29,25 +29,6 @@ def _expand(filename):
     """Expand environment variables and '`~' in a filename."""
     return os.path.expandvars(os.path.expanduser(filename))
 
-# class DirectoryIter:
-
-#     def __init__(self, directory):
-#         self.directory = directory
-#         self.filenames = directory.filenames.copy()
-
-#     def __iter__(self):
-#         return self
-
-#     def __next__(self):
-#         for filename in self.filenames:
-#             name = os.path.join(self.directory.dirname, filename)
-#             data = (self.directory.storage.load(name)
-#                     if self.directory.storage
-#                     else load(name))
-#             print("__next__ yielding", name, data)
-#             yield name, data
-#         raise StopIteration
-
 class DirectoryAsDictionary:
 
     def __init__(self, dirname,
@@ -64,11 +45,14 @@ class DirectoryAsDictionary:
         self.filenames = sorted(os.listdir(self.dirname))
 
     def _file_contents(self, name):
-        return (DirectoryAsDictionary(name)
-                if os.isdir(name)
-                else (self.storage.load(name)
-                      if self.storage
-                      else load(name)))
+        try:
+            return (DirectoryAsDictionary(name)
+                    if os.path.isdir(name)
+                    else (self.storage.load(name)
+                          if self.storage
+                          else load(name)))
+        except PermissionError:
+            return None
 
     def __next__(self):
         for filename in self.filenames:
