@@ -7,4 +7,5 @@ setup(
     author="John C. G. Sturdy",
     author_email="jcg.sturdy@gmail.com",
     packages=find_packages(),
+    install_requires=['frozendict', 'collections', 'pickle', 'tempfile', 'yaml']
 )
