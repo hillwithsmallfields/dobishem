@@ -135,6 +135,7 @@ def open_for_write(filename, *args, direction='w', **kwargs):
     """Return an output stream to the named file.
     If necessary, create the directory the file is to go into."""
     full_name = _expand(filename)
+    print("opening file for writing: %s" % full_name)
     directory = os.path.dirname(full_name)
     if directory:
         os.makedirs(directory, exist_ok=True)
@@ -697,7 +698,7 @@ class FileProtection:
     If it has reduced too much, restore the original contents."""
 
     def __init__(self, filename, max_reduction=0.1):
-        self.filename = filename
+        self.filename = _expand(filename)
         self.max_reduction = max_reduction
         self.data = None
 
