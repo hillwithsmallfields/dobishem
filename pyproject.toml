@@ -7,11 +7,10 @@ name = "dobishem"
 authors = [{name = "John C. G. Sturdy", email = "jcg.sturdy@gmail.com"}]
 description = "Python utilities for my other packages"
 readme = "README.md"
-license = {file = "LICENSE"}
-classifiers = ["License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
-version = "0.0.37"
+license = "GPL-3.0-or-later"
+version = "0.0.38"
 dependencies = [
-  "pyyaml"
+  "pyyaml", "frozendict", "collections", "pickle", "tempfile"
 ]
 
 [tool.pytest.ini_options]
