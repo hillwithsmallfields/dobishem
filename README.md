@@ -49,3 +49,8 @@ Normalization of dates, and some functions for going back or forward
 dates.  I'll probably remove this sometime, as
 https://pypi.org/project/python-dateutil/ and
 https://pypi.org/project/dateutils/ already handle these.
+
+Source
+------
+
+The source of dobishem is at https://github.com/hillwithsmallfields/dobishem
