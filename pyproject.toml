@@ -8,7 +8,7 @@ authors = [{name = "John C. G. Sturdy", email = "jcg.sturdy@gmail.com"}]
 description = "Python utilities for my other packages"
 readme = "README.md"
 license = "GPL-3.0-or-later"
-version = "0.0.42"
+version = "0.0.44"
 dependencies = [
   "frozendict", "pyyaml"
 ]

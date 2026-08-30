@@ -582,6 +582,7 @@ class UsingFiles(Storage):
             for location in self.inputs:
                 print("loading from location", location)
                 yield self.load(location)
+            raise StopIteration    
         else:
             raise StopIteration    
 
